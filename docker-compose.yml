@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reachinbox
+      POSTGRES_PASSWORD: reachinbox
+      POSTGRES_DB: reachinbox
+    ports: ["5433:5432"]
+    volumes: ["reachinbox_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reachinbox -d reachinbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    profiles: ["search"]
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports: ["9200:9200"]
+    volumes: ["reachinbox_esdata:/usr/share/elasticsearch/data"]
+volumes:
+  reachinbox_pgdata:
+  reachinbox_esdata:
