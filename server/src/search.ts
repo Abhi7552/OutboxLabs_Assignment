@@ -1,7 +1,7 @@
 import { Client } from '@elastic/elasticsearch';
 import { config } from './config.js';
 
-export const searchClient = new Client({ node: config.ELASTICSEARCH_URL });
+export const searchClient = new Client({ node: config.ELASTICSEARCH_URL, requestTimeout: 750, maxRetries: 0 });
 const index = 'reachinbox-emails';
 
 export async function ensureSearchIndex() {

@@ -33,7 +33,7 @@ async function processEmail(job: Job<EmailJob>) {
   try {
     const previewUrl = await sendEmail({ from: email.sender.email, to: email.recipient, subject: email.subject, html: email.body });
     const sent = await prisma.email.update({ where: { id: email.id }, data: { status: 'SENT', sentAt: new Date() } });
-    await indexEmail(sent);
+    void indexEmail(sent);
     if (previewUrl) console.log(`Sent ${email.id}; preview: ${previewUrl}`);
   } catch (error) {
     await prisma.email.update({ where: { id: email.id }, data: { status: 'FAILED', failureReason: error instanceof Error ? error.message : 'Unknown SMTP failure' } });

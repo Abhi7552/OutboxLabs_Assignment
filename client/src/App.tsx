@@ -5,15 +5,24 @@ type User = { id: string; name: string; email: string; avatarUrl?: string; slack
 type Email = { id: string; recipient: string; subject: string; body: string; scheduledAt: string; sentAt?: string | null; status: 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED'; sender: Sender };
 
 const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
-  const response = await fetch(path, { headers: { 'content-type': 'application/json' }, ...options });
-  if (!response.ok) throw new Error((await response.json()).message ?? 'Something went wrong');
-  return response.json();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(path, { headers: { 'content-type': 'application/json' }, ...options });
+      if (!response.ok) throw new Error((await response.json()).message ?? 'Something went wrong');
+      return response.json();
+    } catch (error) {
+      if (!(error instanceof TypeError) || attempt === 2) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+  }
+  throw new Error('Unable to connect to API');
 };
 const formatDate = (value: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
 const initials = (name: string) => name.split(' ').map((part) => part[0]).join('').slice(0, 2);
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [senders, setSenders] = useState<Sender[]>([]);
   const [emails, setEmails] = useState<Email[]>([]);
   const [view, setView] = useState<'SCHEDULED' | 'SENT'>('SCHEDULED');
@@ -23,26 +32,54 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = async () => {
+  useEffect(() => {
+    const authError = new URLSearchParams(window.location.search).get('authError');
+    if (authError) setError(authError);
+    void api<User>('/api/me').then(setUser).catch(() => undefined).finally(() => setAuthChecked(true));
+  }, []);
+
+  const loadEmails = async () => {
+    if (!user) { setLoading(false); return; }
     try {
-      const [me, senderList, emailList] = await Promise.all([api<User>('/api/me'), api<Sender[]>('/api/senders'), api<Email[]>(`/api/emails?status=${view}&search=${encodeURIComponent(search)}`)]);
-      setUser(me); setSenders(senderList); setEmails(emailList); setError('');
+      const emailList = await api<Email[]>(`/api/emails?status=${view}&search=${encodeURIComponent(search)}`);
+      setEmails(emailList); setError('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to connect to API'); }
     finally { setLoading(false); }
   };
-  useEffect(() => { void load(); }, [view, search]);
-  useEffect(() => { const timer = window.setInterval(() => void load(), 10000); return () => window.clearInterval(timer); }, [view, search]);
+  useEffect(() => {
+    if (!user) return;
+    void api<Sender[]>('/api/senders').then(setSenders).catch(() => undefined);
+  }, [user?.id]);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const refresh = async () => {
+      await loadEmails();
+      if (!cancelled) timer = window.setTimeout(refresh, 10000);
+    };
+    const debounce = window.setTimeout(() => void refresh(), 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(debounce);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [view, search, user?.id]);
 
   const connectSlack = () => { window.location.href = '/api/slack/connect'; };
   const disconnectSlack = async () => { await api('/api/slack/disconnect', { method: 'POST', body: '{}' }); setUser((current) => current ? { ...current, slackToken: null } : current); };
+  const signOut = async () => { await api('/api/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined); setUser(null); };
 
-  if (composeOpen) return <Compose sender={senders[0]} onClose={() => setComposeOpen(false)} onCreated={() => { setComposeOpen(false); setView('SCHEDULED'); void load(); }} />;
+  if (!authChecked) return <main className="login-page"><div className="login-loading"><span className="spinner" /> Checking your Google session</div></main>;
+  if (!user) return <Login error={error} />;
+
+  if (composeOpen) return <Compose sender={senders[0]} onClose={() => setComposeOpen(false)} onCreated={() => { setComposeOpen(false); setView('SCHEDULED'); void loadEmails(); }} />;
   if (selected) return <EmailDetail email={selected} onBack={() => setSelected(null)} />;
 
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand">out<span>8</span></div>
-      {user && <div className="account"><img src={user.avatarUrl} alt="" /><span><strong>{user.name}</strong><small>{user.email}</small></span><b>⌄</b></div>}
+      <button className="account" onClick={signOut}><img src={user.avatarUrl} alt="" /><span><strong>{user.name}</strong><small>{user.email}</small></span><b>↪</b></button>
       <button className="compose-btn" onClick={() => setComposeOpen(true)}>＋ Compose</button>
       <div className="nav-label">Workspace</div>
       <button className={view === 'SCHEDULED' ? 'nav-item active' : 'nav-item'} onClick={() => setView('SCHEDULED')}><span>◷</span> Scheduled <em>{view === 'SCHEDULED' ? emails.length : ''}</em></button>
@@ -54,7 +91,7 @@ function App() {
       </div>
     </aside>
     <main className="main-panel">
-      <header className="topbar"><div><p className="eyebrow">Outbound workspace</p><h1>{view === 'SCHEDULED' ? 'Scheduled' : 'Sent mail'}</h1></div><div className="top-actions"><div className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search emails" /></div><button className="icon-btn" title="Refresh" onClick={() => void load()}>↻</button><div className="presence">● Live</div></div></header>
+      <header className="topbar"><div><p className="eyebrow">Outbound workspace</p><h1>{view === 'SCHEDULED' ? 'Scheduled' : 'Sent mail'}</h1></div><div className="top-actions"><div className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search emails" /></div><button className="icon-btn" title="Refresh" onClick={() => void loadEmails()}>↻</button><div className="presence">● Live</div><div className="top-profile"><img src={user.avatarUrl} alt="" /><span><strong>{user.name}</strong><small>{user.email}</small></span><button onClick={() => void signOut()} title="Log out">↪</button></div></div></header>
       <section className="content">
         <div className="content-head"><div><p className="muted">{view === 'SCHEDULED' ? 'Queued and ready to go' : 'Delivered through your senders'}</p></div><button className="text-btn" onClick={() => setComposeOpen(true)}>＋ New email</button></div>
         {error && <div className="notice error">{error}. Run <code>npm run db:push && npm run db:seed</code> to initialize the demo.</div>}
@@ -62,6 +99,10 @@ function App() {
       </section>
     </main>
   </div>;
+}
+
+function Login({ error }: { error: string }) {
+  return <main className="login-page"><div className="login-brand">out<span>8</span><small>ReachInbox workspace</small></div><section className="login-card"><div className="login-heading"><p className="eyebrow">Welcome back</p><h1>Login</h1><p>Sign in with your Google account to continue.</p></div><button type="button" className="google-btn" onClick={() => { window.location.href = '/api/auth/google'; }}><strong>G</strong> Continue with Google <span>↗</span></button>{error && <div className="login-error">{error}</div>}<p className="oauth-note">Your name, email, and Google profile avatar will appear in the dashboard after authorization.</p></section><p className="login-footer">Built for focused, reliable outbound work.</p></main>;
 }
 
 function Compose({ sender, onClose, onCreated }: { sender?: Sender; onClose: () => void; onCreated: () => void }) {
