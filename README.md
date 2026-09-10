@@ -229,3 +229,5 @@ docker compose down
 - `.env` is ignored by Git. Keep Ethereal and Slack secrets there.
 - If credentials were committed or shared publicly, rotate them before continuing.
 - This assignment uses a seeded demo user rather than production authentication. Add authentication and encrypted secret storage before public deployment.
+#   O u t b o x L a b s _ A s s i g n m e n t  
+ 
