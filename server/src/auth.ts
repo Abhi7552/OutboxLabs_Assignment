@@ -6,6 +6,8 @@ import { config } from './config.js';
 
 const sessionCookie = 'reachinbox_session';
 const sessionTtl = 60 * 60 * 24 * 7;
+const secureCookie = config.NODE_ENV === 'production';
+const cookieAttributes = `HttpOnly; SameSite=Lax; Max-Age=${sessionTtl}; Path=/${secureCookie ? '; Secure' : ''}`;
 
 function cookieValue(request: Request, name: string) {
   const header = request.headers.cookie ?? '';
@@ -39,7 +41,7 @@ export async function completeGoogleLogin(code: string, state: string, response:
 
   const session = crypto.randomBytes(32).toString('hex');
   await redis.set(`auth:session:${session}`, user.id, 'EX', sessionTtl);
-  response.setHeader('Set-Cookie', `${sessionCookie}=${session}; HttpOnly; SameSite=Lax; Max-Age=${sessionTtl}; Path=/`);
+  response.setHeader('Set-Cookie', `${sessionCookie}=${session}; ${cookieAttributes}`);
   return user;
 }
 
@@ -48,11 +50,21 @@ export async function currentUser(request: Request) {
   if (!token) return null;
   const userId = await redis.get(`auth:session:${token}`);
   if (!userId) return null;
-  return prisma.user.findUnique({ where: { id: userId }, include: { senders: true } });
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      avatarUrl: true,
+      slackToken: true,
+      senders: { select: { id: true, name: true, email: true } }
+    }
+  });
 }
 
 export async function logout(request: Request, response: Response) {
   const token = cookieValue(request, sessionCookie);
   if (token) await redis.del(`auth:session:${token}`);
-  response.setHeader('Set-Cookie', `${sessionCookie}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/`);
+  response.setHeader('Set-Cookie', `${sessionCookie}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/${secureCookie ? '; Secure' : ''}`);
 }

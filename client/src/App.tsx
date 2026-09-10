@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 
 type Sender = { id: string; name: string; email: string };
-type User = { id: string; name: string; email: string; avatarUrl?: string; slackToken?: string | null };
+type User = { id: string; name: string; email: string; avatarUrl?: string; slackConnected?: boolean };
 type Email = { id: string; recipient: string; subject: string; body: string; scheduledAt: string; sentAt?: string | null; status: 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED'; sender: Sender };
 
 const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
@@ -67,7 +67,7 @@ function App() {
   }, [view, search, user?.id]);
 
   const connectSlack = () => { window.location.href = '/api/slack/connect'; };
-  const disconnectSlack = async () => { await api('/api/slack/disconnect', { method: 'POST', body: '{}' }); setUser((current) => current ? { ...current, slackToken: null } : current); };
+  const disconnectSlack = async () => { await api('/api/slack/disconnect', { method: 'POST', body: '{}' }); setUser((current) => current ? { ...current, slackConnected: false } : current); };
   const signOut = async () => { await api('/api/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined); setUser(null); };
 
   if (!authChecked) return <main className="login-page"><div className="login-loading"><span className="spinner" /> Checking your Google session</div></main>;
@@ -86,7 +86,7 @@ function App() {
       <button className={view === 'SENT' ? 'nav-item active' : 'nav-item'} onClick={() => setView('SENT')}><span>➤</span> Sent <em>{view === 'SENT' ? emails.length : ''}</em></button>
       <div className="sidebar-bottom">
         <div className="nav-label">Integrations</div>
-        {user?.slackToken ? <button className="integration connected" onClick={disconnectSlack}><i>●</i> Slack connected <span>×</span></button> : <button className="integration" onClick={connectSlack}><i>●</i> Connect Slack <span>→</span></button>}
+        {user?.slackConnected ? <button className="integration connected" onClick={disconnectSlack}><i>●</i> Slack connected <span>×</span></button> : <button className="integration" onClick={connectSlack}><i>●</i> Connect Slack <span>→</span></button>}
         <a className="integration" href="http://localhost:4000/admin/queues" target="_blank" rel="noreferrer"><i>▦</i> Queue monitor <span>↗</span></a>
       </div>
     </aside>
@@ -111,6 +111,6 @@ function Compose({ sender, onClose, onCreated }: { sender?: Sender; onClose: () 
   return <div className="compose-page"><header className="compose-header"><button className="back-btn" onClick={onClose}>←</button><h1>Compose new email</h1><div className="compose-tools"><span>⌕</span><span>◷</span><button className="send-btn" form="compose-form" disabled={busy}>{busy ? 'Scheduling…' : 'Schedule'}</button></div></header><form id="compose-form" onSubmit={submit} className="compose-form"><div className="form-row"><label>From</label><div className="sender-pill">{sender?.email ?? 'No sender configured'}⌄</div></div><div className="form-row"><label>To</label><input required type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@example.com" /><button type="button" className="upload-btn">↥ Upload list</button></div><div className="form-row"><label>Subject</label><input required value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Subject" /></div><div className="form-row schedule-row"><label>Send at</label><input required type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /><span className="schedule-hint">Uses BullMQ delayed delivery</span></div><div className="editor"><textarea required value={body} onChange={(event) => setBody(event.target.value)} placeholder="Type your message…" /><div className="toolbar"><span>↶</span><span>↷</span><span>|</span><b>B</b><i>I</i><u>U</u><span>|</span><span>≡</span><span>☷</span><span>❝</span><span>⌁</span></div></div>{error && <div className="notice error">{error}</div>}<p className="compose-footnote">Messages are sent through Ethereal SMTP for safe testing. Rate limits and queue state are handled server-side.</p></form></div>;
 }
 
-function EmailDetail({ email, onBack }: { email: Email; onBack: () => void }) { return <div className="detail-page"><header className="detail-header"><button className="back-btn" onClick={onBack}>←</button><h1>{email.subject}</h1><div className="detail-actions">☆　□　⌫</div></header><article className="message"><div className="message-meta"><div className="avatar">{initials(email.sender.name)}</div><div><strong>{email.sender.name}</strong><small>&lt;{email.sender.email}&gt;</small><span>to {email.recipient}</span></div><time>{formatDate(email.sentAt ?? email.scheduledAt)}</time></div><div className="message-body"><p className="message-status">{email.status === 'SENT' ? 'Delivered successfully' : 'Scheduled for delivery'}</p><div dangerouslySetInnerHTML={{ __html: email.body }} /></div></article></div>; }
+function EmailDetail({ email, onBack }: { email: Email; onBack: () => void }) { return <div className="detail-page"><header className="detail-header"><button className="back-btn" onClick={onBack}>←</button><h1>{email.subject}</h1><div className="detail-actions">☆　□　⌫</div></header><article className="message"><div className="message-meta"><div className="avatar">{initials(email.sender.name)}</div><div><strong>{email.sender.name}</strong><small>&lt;{email.sender.email}&gt;</small><span>to {email.recipient}</span></div><time>{formatDate(email.sentAt ?? email.scheduledAt)}</time></div><div className="message-body"><p className="message-status">{email.status === 'SENT' ? 'Delivered successfully' : 'Scheduled for delivery'}</p><div>{email.body}</div></div></article></div>; }
 
 export default App;

@@ -53,6 +53,8 @@ Copy `.env.example` to `.env` for local development. In production, inject these
 | `WORKER_CONCURRENCY` | Number of concurrent delivery jobs |
 | `MIN_SEND_DELAY_MS` | Delay before each SMTP send |
 | `MAX_EMAILS_PER_HOUR_PER_SENDER` | Per-sender hourly limit |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | Production SMTP connection |
+| `SMTP_USER` / `SMTP_PASS` | Production SMTP credentials |
 | `ETHEREAL_USER` / `ETHEREAL_PASS` | Test SMTP credentials; replace with production SMTP settings in a real deployment |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials |
 | `GOOGLE_REDIRECT_URI` | Google callback URL |

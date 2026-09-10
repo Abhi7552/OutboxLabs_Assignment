@@ -5,6 +5,11 @@ let transporter: Transporter | undefined;
 
 async function getTransporter() {
   if (transporter) return transporter;
+  if (config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS) {
+    transporter = nodemailer.createTransport({ host: config.SMTP_HOST, port: config.SMTP_PORT, secure: config.SMTP_SECURE, auth: { user: config.SMTP_USER, pass: config.SMTP_PASS } });
+    return transporter;
+  }
+  if (config.NODE_ENV === 'production') throw new Error('Production SMTP is not configured');
   if (config.ETHEREAL_USER && config.ETHEREAL_PASS) {
     transporter = nodemailer.createTransport({ host: 'smtp.ethereal.email', port: 587, secure: false, auth: { user: config.ETHEREAL_USER, pass: config.ETHEREAL_PASS } });
     return transporter;
