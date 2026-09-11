@@ -7,11 +7,14 @@ type Email = { id: string; recipient: string; subject: string; body: string; sch
 const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const response = await fetch(path, { headers: { 'content-type': 'application/json' }, ...options });
+      const response = await fetch(path, { headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8000), ...options });
       if (!response.ok) throw new Error((await response.json()).message ?? 'Something went wrong');
       return response.json();
     } catch (error) {
-      if (!(error instanceof TypeError) || attempt === 2) throw error;
+      if (!(error instanceof TypeError) && !(error instanceof DOMException && error.name === 'TimeoutError') || attempt === 2) {
+        if (error instanceof DOMException && error.name === 'TimeoutError') throw new Error('The API request timed out. Check that Redis and the database are running.');
+        throw error;
+      }
       await new Promise((resolve) => window.setTimeout(resolve, 250));
     }
   }

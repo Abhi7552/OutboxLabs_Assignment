@@ -4,7 +4,11 @@ import { config } from './config.js';
 
 export type EmailJob = { emailId: string; senderId: string };
 
-export const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
+export const redis = new Redis(config.REDIS_URL, {
+  maxRetriesPerRequest: null,
+  connectTimeout: 5000,
+  retryStrategy: (attempt) => attempt >= 3 ? null : Math.min(attempt * 500, 2000)
+});
 export const emailQueue = new Queue<EmailJob>('email-delivery', {
   connection: redis,
   defaultJobOptions: {
