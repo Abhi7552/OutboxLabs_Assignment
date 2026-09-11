@@ -3,7 +3,7 @@ services:
     name: reachinbox
     runtime: node
     plan: free
-    buildCommand: npm ci && npx prisma generate --schema server/prisma/schema.prisma && npm run db:push && npm run build
+    buildCommand: npm ci --include=dev && npx prisma generate --schema server/prisma/schema.prisma && npm run db:push && npm run build
     startCommand: npm run start:demo
     healthCheckPath: /api/health
     envVars:

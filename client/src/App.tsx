@@ -4,10 +4,11 @@ type Sender = { id: string; name: string; email: string };
 type User = { id: string; name: string; email: string; avatarUrl?: string; slackConnected?: boolean };
 type Email = { id: string; recipient: string; subject: string; body: string; scheduledAt: string; sentAt?: string | null; status: 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED'; sender: Sender };
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const response = await fetch(path, { headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8000), ...options });
+      const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8000), ...options });
       if (!response.ok) throw new Error((await response.json()).message ?? 'Something went wrong');
       return response.json();
     } catch (error) {
@@ -69,7 +70,7 @@ function App() {
     };
   }, [view, search, user?.id]);
 
-  const connectSlack = () => { window.location.href = '/api/slack/connect'; };
+  const connectSlack = () => { window.location.href = `${apiBaseUrl}/api/slack/connect`; };
   const disconnectSlack = async () => { await api('/api/slack/disconnect', { method: 'POST', body: '{}' }); setUser((current) => current ? { ...current, slackConnected: false } : current); };
   const signOut = async () => { await api('/api/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined); setUser(null); };
 
@@ -90,7 +91,7 @@ function App() {
       <div className="sidebar-bottom">
         <div className="nav-label">Integrations</div>
         {user?.slackConnected ? <button className="integration connected" onClick={disconnectSlack}><i>●</i> Slack connected <span>×</span></button> : <button className="integration" onClick={connectSlack}><i>●</i> Connect Slack <span>→</span></button>}
-        <a className="integration" href="http://localhost:4000/admin/queues" target="_blank" rel="noreferrer"><i>▦</i> Queue monitor <span>↗</span></a>
+        <a className="integration" href={`${apiBaseUrl}/admin/queues`} target="_blank" rel="noreferrer"><i>▦</i> Queue monitor <span>↗</span></a>
       </div>
     </aside>
     <main className="main-panel">
@@ -105,7 +106,7 @@ function App() {
 }
 
 function Login({ error }: { error: string }) {
-  return <main className="login-page"><div className="login-brand">out<span>8</span><small>ReachInbox workspace</small></div><section className="login-card"><div className="login-heading"><p className="eyebrow">Welcome back</p><h1>Login</h1><p>Sign in with your Google account to continue.</p></div><button type="button" className="google-btn" onClick={() => { window.location.href = '/api/auth/google'; }}><strong>G</strong> Continue with Google <span>↗</span></button>{error && <div className="login-error">{error}</div>}<p className="oauth-note">Your name, email, and Google profile avatar will appear in the dashboard after authorization.</p></section><p className="login-footer">Built for focused, reliable outbound work.</p></main>;
+  return <main className="login-page"><div className="login-brand">out<span>8</span><small>ReachInbox workspace</small></div><section className="login-card"><div className="login-heading"><p className="eyebrow">Welcome back</p><h1>Login</h1><p>Sign in with your Google account to continue.</p></div><button type="button" className="google-btn" onClick={() => { window.location.href = `${apiBaseUrl}/api/auth/google`; }}><strong>G</strong> Continue with Google <span>↗</span></button>{error && <div className="login-error">{error}</div>}<p className="oauth-note">Your name, email, and Google profile avatar will appear in the dashboard after authorization.</p></section><p className="login-footer">Built for focused, reliable outbound work.</p></main>;
 }
 
 function Compose({ sender, onClose, onCreated }: { sender?: Sender; onClose: () => void; onCreated: () => void }) {
