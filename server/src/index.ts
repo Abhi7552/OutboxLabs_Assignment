@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'node:path';
 import cors from 'cors';
 import { z } from 'zod';
 import { prisma } from './db.js';
@@ -76,6 +77,13 @@ app.get('/api/slack/callback', async (req, res) => {
   } catch (error) { return res.status(400).send(error instanceof Error ? error.message : 'Slack authorization failed'); }
 });
 app.post('/api/slack/disconnect', async (req, res) => { const user = await currentUser(req); if (user) await prisma.user.update({ where: { id: user.id }, data: { slackToken: null, slackTeamId: null } }); res.json({ ok: true }); });
+
+const clientDirectory = path.resolve(process.cwd(), 'dist/client');
+app.use(express.static(clientDirectory));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/admin/')) return next();
+  return res.sendFile(path.join(clientDirectory, 'index.html'));
+});
 
 ensureSearchIndex().catch(console.error);
 app.listen(config.PORT, () => console.log(`ReachInbox API listening on http://localhost:${config.PORT}`));

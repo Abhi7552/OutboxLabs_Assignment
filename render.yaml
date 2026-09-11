@@ -1,0 +1,102 @@
+services:
+  - type: keyvalue
+    name: reachinbox-redis
+    plan: starter
+    ipAllowList: []
+
+  - type: web
+    name: reachinbox
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npx prisma generate --schema server/prisma/schema.prisma && npm run build
+    preDeployCommand: npm run db:push
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reachinbox-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: reachinbox-redis
+          property: connectionString
+      - key: CLIENT_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: WORKER_CONCURRENCY
+        value: "5"
+      - key: MIN_SEND_DELAY_MS
+        value: "2000"
+      - key: MAX_EMAILS_PER_HOUR_PER_SENDER
+        value: "200"
+
+  - type: worker
+    name: reachinbox-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npx prisma generate --schema server/prisma/schema.prisma && npm run build:server
+    startCommand: node dist/server/src/worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reachinbox-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: reachinbox-redis
+          property: connectionString
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: SESSION_SECRET
+        fromService:
+          type: web
+          name: reachinbox
+          envVarKey: SESSION_SECRET
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: WORKER_CONCURRENCY
+        value: "5"
+      - key: MIN_SEND_DELAY_MS
+        value: "2000"
+      - key: MAX_EMAILS_PER_HOUR_PER_SENDER
+        value: "200"
+
+databases:
+  - name: reachinbox-db
+    plan: starter
