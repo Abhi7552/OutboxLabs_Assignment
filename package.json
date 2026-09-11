@@ -11,6 +11,7 @@
     "build:server": "tsc -p server/tsconfig.json",
     "build:web": "vite build --config client/vite.config.ts",
     "start": "node dist/server/src/index.js",
+    "start:demo": "concurrently -n api,worker \"node dist/server/src/index.js\" \"node dist/server/src/worker.js\"",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit",
     "db:push": "prisma db push --schema server/prisma/schema.prisma",
     "db:seed": "tsx server/prisma/seed.ts"
